@@ -1,0 +1,903 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>JOS-3 Thermoregulation Dashboard — ClimaCoder</title>
+    <link rel="icon" type="image/png" href="/assets/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            color: #1e293b;
+            min-height: 100vh;
+        }
+
+        .header {
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: #fff;
+        }
+        .header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #0f766e;
+        }
+        .header span {
+            font-size: 0.8rem;
+            color: #64748b;
+            background: #f0fdfa;
+            padding: 0.2rem 0.6rem;
+            border-radius: 4px;
+            border: 1px solid #ccfbf1;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 320px 1fr 300px;
+            gap: 1.5rem;
+            padding: 1.5rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Controls panel */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .control-group {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+        }
+        .control-group h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 0.8rem;
+        }
+        .slider-row {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+            margin-bottom: 0.8rem;
+        }
+        .slider-row:last-child { margin-bottom: 0; }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+        }
+        .slider-label .value {
+            color: #0f766e;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: #e2e8f0;
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #0f766e;
+            cursor: pointer;
+        }
+        select {
+            width: 100%;
+            padding: 0.5rem;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            color: #1e293b;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+
+        /* Center: charts */
+        .charts {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .chart-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1.2rem;
+        }
+        .chart-card h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 0.8rem;
+        }
+        canvas { width: 100% !important; }
+
+        /* Right: body map + stats */
+        .stats-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .stat-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+        }
+        .stat-card .stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 0.2rem;
+        }
+        .stat-safe { color: #16a34a; }
+        .stat-caution { color: #ca8a04; }
+        .stat-danger { color: #dc2626; }
+        .stat-extreme { color: #b91c1c; font-weight: 800; }
+
+        .alert-banner {
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-align: center;
+        }
+        .alert-safe { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+        .alert-caution { background: #fefce8; border: 1px solid #fef08a; color: #854d0e; }
+        .alert-danger { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+        .alert-extreme { background: #fef2f2; border: 1px solid #f87171; color: #7f1d1d; }
+
+        .body-map {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem;
+        }
+        .body-map h3 {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #64748b;
+            margin-bottom: 0.5rem;
+        }
+        .body-map svg { width: 100%; }
+
+        .segment-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.3rem;
+            font-size: 0.7rem;
+        }
+        .segment-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.25rem 0.4rem;
+            border-radius: 4px;
+            background: #f8fafc;
+        }
+        .segment-item .seg-temp {
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .run-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background: #0f766e;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .run-btn:hover { background: #0d9488; }
+        .run-btn:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+
+        .footer-note {
+            padding: 1rem 2rem;
+            text-align: center;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            border-top: 1px solid #e2e8f0;
+        }
+        .footer-note a { color: #0f766e; text-decoration: none; }
+
+        @media (max-width: 1100px) {
+            .dashboard { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>JOS-3 Thermoregulation Dashboard</h1>
+        <span>17-segment physiological model</span>
+        <span>ClimaCoder prototype</span>
+        <button id="unit-toggle" onclick="toggleUnits()" style="
+            margin-left: auto; padding: 0.3rem 0.8rem; border-radius: 6px;
+            border: 1px solid #e2e8f0; background: #fff; color: #0f766e;
+            font-weight: 600; font-size: 0.75rem; cursor: pointer;
+        ">Switch to °F / ft / lbs</button>
+    </div>
+
+    <div class="dashboard">
+        <!-- Left: Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <h3>Environment</h3>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Air Temperature</span><span class="value" id="v-ta">35°C</span></div>
+                    <input type="range" id="s-ta" min="20" max="55" value="35" step="1">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Mean Radiant Temp</span><span class="value" id="v-tr">40°C</span></div>
+                    <input type="range" id="s-tr" min="20" max="70" value="40" step="1">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Relative Humidity</span><span class="value" id="v-rh">60%</span></div>
+                    <input type="range" id="s-rh" min="10" max="100" value="60" step="5">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Wind Speed</span><span class="value" id="v-va">0.5 m/s</span></div>
+                    <input type="range" id="s-va" min="0" max="5" value="0.5" step="0.1">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Body Parameters</h3>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Height (cm)</span><span class="value" id="v-height">170 cm</span></div>
+                    <input type="range" id="s-height" min="140" max="210" value="170" step="1">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Weight (kg)</span><span class="value" id="v-weight">70 kg</span></div>
+                    <input type="range" id="s-weight" min="40" max="150" value="70" step="1">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Age</span><span class="value" id="v-age">30</span></div>
+                    <input type="range" id="s-age" min="18" max="80" value="30" step="1">
+                </div>
+                <div class="slider-row">
+                    <label class="slider-label" for="sel-sex"><span>Sex</span></label>
+                    <select id="sel-sex">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                    </select>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Body Fat (%)</span><span class="value" id="v-fat">auto</span></div>
+                    <input type="range" id="s-fat" min="0" max="45" value="0" step="1">
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">
+                        0 = auto-estimate from height/weight/age/sex
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Worker Profile</h3>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Activity Level (MET)</span><span class="value" id="v-met">2.0</span></div>
+                    <input type="range" id="s-met" min="0.8" max="5" value="2.0" step="0.1">
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">
+                        0.8 sitting &middot; 1.5 standing &middot; 2.5 moderate &middot; 3.5 heavy &middot; 5.0 extreme
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Clothing (clo)</span><span class="value" id="v-clo">0.5</span></div>
+                    <input type="range" id="s-clo" min="0.1" max="2.0" value="0.5" step="0.1">
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">
+                        0.3 shorts &middot; 0.5 light work &middot; 1.0 coveralls &middot; 1.5 PPE
+                    </div>
+                </div>
+                <div class="slider-row">
+                    <label class="slider-label" for="sel-posture"><span>Posture</span></label>
+                    <select id="sel-posture">
+                        <option value="standing">Standing</option>
+                        <option value="sitting">Sitting</option>
+                        <option value="lying">Lying</option>
+                    </select>
+                </div>
+                <div class="slider-row">
+                    <label class="slider-label" for="sel-accl"><span>Acclimatization</span></label>
+                    <select id="sel-accl">
+                        <option value="unacclimatized">Unacclimatized</option>
+                        <option value="acclimatized">Acclimatized</option>
+                    </select>
+                    <div style="font-size:0.65rem; color:#64748b; margin-top:2px;">
+                        ISO 7933: core 38.0°C / wettedness 85% (unacc.) &middot; 38.5°C / 100% (acc.)
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Simulation</h3>
+                <div class="slider-row">
+                    <div class="slider-label"><span>Duration</span><span class="value" id="v-dur">60 min</span></div>
+                    <input type="range" id="s-dur" min="15" max="480" value="60" step="15">
+                </div>
+                <button class="run-btn" id="run-btn" onclick="runSimulation()">Run JOS-3 Simulation</button>
+            </div>
+
+            <div id="alert-box" class="alert-banner alert-safe">
+                Adjust parameters and run simulation
+            </div>
+        </div>
+
+        <!-- Center: Charts -->
+        <div class="charts">
+            <div class="chart-card">
+                <h3>Core Temperature Over Time</h3>
+                <canvas id="chart-core" height="200"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Skin Temperature by Segment</h3>
+                <canvas id="chart-skin" height="200"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Skin Wettedness (Sweat)</h3>
+                <canvas id="chart-wet" height="150"></canvas>
+            </div>
+        </div>
+
+        <!-- Right: Stats -->
+        <div class="stats-panel">
+            <div class="stat-card">
+                <div class="stat-value stat-safe" id="stat-core">37.0°C</div>
+                <div class="stat-label">Peak Core Temperature</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-skin" style="color:#0284c7;">34.5°C</div>
+                <div class="stat-label">Mean Skin Temperature</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-time" style="color:#7c3aed;">--</div>
+                <div class="stat-label">Max Safe Exposure Time</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-wet" style="color:#d97706;">0%</div>
+                <div class="stat-label">Peak Skin Wettedness</div>
+            </div>
+
+            <div class="body-map">
+                <h3>Skin Temperature Map (at end)</h3>
+                <svg viewBox="0 0 200 400" id="body-svg">
+                    <!-- Head -->
+                    <circle cx="100" cy="30" r="22" fill="#4ade80" stroke="#cbd5e1" stroke-width="1" id="seg-head"/>
+                    <!-- Neck -->
+                    <rect x="92" y="52" width="16" height="15" rx="4" fill="#4ade80" id="seg-neck"/>
+                    <!-- Chest -->
+                    <rect x="65" y="67" width="35" height="50" rx="6" fill="#4ade80" id="seg-chest"/>
+                    <!-- Back -->
+                    <rect x="100" y="67" width="35" height="50" rx="6" fill="#4ade80" id="seg-back"/>
+                    <!-- Pelvis -->
+                    <rect x="68" y="117" width="64" height="30" rx="8" fill="#4ade80" id="seg-pelvis"/>
+                    <!-- Left arm -->
+                    <rect x="40" y="70" width="20" height="22" rx="5" fill="#4ade80" id="seg-lshoulder"/>
+                    <rect x="38" y="92" width="18" height="30" rx="5" fill="#4ade80" id="seg-larm"/>
+                    <rect x="35" y="122" width="16" height="18" rx="5" fill="#4ade80" id="seg-lhand"/>
+                    <!-- Right arm -->
+                    <rect x="140" y="70" width="20" height="22" rx="5" fill="#4ade80" id="seg-rshoulder"/>
+                    <rect x="142" y="92" width="18" height="30" rx="5" fill="#4ade80" id="seg-rarm"/>
+                    <rect x="145" y="122" width="16" height="18" rx="5" fill="#4ade80" id="seg-rhand"/>
+                    <!-- Left leg -->
+                    <rect x="68" y="150" width="28" height="55" rx="6" fill="#4ade80" id="seg-lthigh"/>
+                    <rect x="70" y="208" width="24" height="55" rx="6" fill="#4ade80" id="seg-lleg"/>
+                    <rect x="68" y="266" width="26" height="20" rx="6" fill="#4ade80" id="seg-lfoot"/>
+                    <!-- Right leg -->
+                    <rect x="104" y="150" width="28" height="55" rx="6" fill="#4ade80" id="seg-rthigh"/>
+                    <rect x="106" y="208" width="24" height="55" rx="6" fill="#4ade80" id="seg-rleg"/>
+                    <rect x="104" y="266" width="26" height="20" rx="6" fill="#4ade80" id="seg-rfoot"/>
+                    <!-- Legend -->
+                    <text x="100" y="320" text-anchor="middle" fill="#94a3b8" font-size="10">skin temperature gradient</text>
+                    <defs>
+                        <linearGradient id="tempGrad" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="rgb(59,130,246)"/>
+                            <stop offset="25%" stop-color="rgb(34,197,94)"/>
+                            <stop offset="50%" stop-color="rgb(250,204,21)"/>
+                            <stop offset="67%" stop-color="rgb(249,115,22)"/>
+                            <stop offset="83%" stop-color="rgb(239,68,68)"/>
+                            <stop offset="100%" stop-color="rgb(168,85,247)"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="30" y="340" width="140" height="8" rx="4" fill="url(#tempGrad)"/>
+                    <text x="30" y="360" fill="#94a3b8" font-size="7">30°C</text>
+                    <text x="65" y="360" fill="#94a3b8" font-size="7" text-anchor="middle">33°</text>
+                    <text x="135" y="360" fill="#94a3b8" font-size="7" text-anchor="middle">40°</text>
+                    <text x="170" y="360" fill="#94a3b8" font-size="7" text-anchor="end">42°C</text>
+                </svg>
+            </div>
+
+            <div class="body-map">
+                <h3>Segment Temperatures</h3>
+                <div class="segment-grid" id="segment-grid">
+                    <!-- Filled by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        JOS-3 model by Takahashi et al. (2020), Waseda University &middot; MIT License &middot;
+        Built by <a href="https://climacoder.com">ClimaCoder</a> &middot;
+        This is a client-side demo — simulation runs via <a href="https://github.com/niccokunzmann/pyodide">Pyodide</a> in your browser
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.js"></script>
+
+    <script>
+    let pyodide = null;
+    let charts = {};
+
+    // Slider value displays
+    const sliders = {
+        'ta':     { el: 's-ta',     vEl: 'v-ta',     fmt: v => v + '°C' },
+        'tr':     { el: 's-tr',     vEl: 'v-tr',     fmt: v => v + '°C' },
+        'rh':     { el: 's-rh',     vEl: 'v-rh',     fmt: v => v + '%' },
+        'va':     { el: 's-va',     vEl: 'v-va',     fmt: v => v + ' m/s' },
+        'height': { el: 's-height', vEl: 'v-height', fmt: v => v + ' cm' },
+        'weight': { el: 's-weight', vEl: 'v-weight', fmt: v => v + ' kg' },
+
+        'age':    { el: 's-age',    vEl: 'v-age',    fmt: v => v },
+        'fat':    { el: 's-fat',    vEl: 'v-fat',    fmt: v => v == 0 ? 'auto' : v + '%' },
+        'met':    { el: 's-met',    vEl: 'v-met',    fmt: v => v },
+        'clo':    { el: 's-clo',    vEl: 'v-clo',    fmt: v => v },
+        'dur':    { el: 's-dur',    vEl: 'v-dur',    fmt: v => v + ' min' },
+    };
+    for (const [k, s] of Object.entries(sliders)) {
+        document.getElementById(s.el).addEventListener('input', e => {
+            document.getElementById(s.vEl).textContent = s.fmt(e.target.value);
+        });
+    }
+
+    // Unit toggle: metric ↔ imperial
+    let imperial = false;
+
+    function toggleUnits() {
+        imperial = !imperial;
+        const btn = document.getElementById('unit-toggle');
+        btn.textContent = imperial ? 'Switch to °C / cm / kg' : 'Switch to °F / ft / lbs';
+
+        const hSlider = document.getElementById('s-height');
+        const wSlider = document.getElementById('s-weight');
+        const hLabel = document.querySelector('[for="s-height"], #s-height').closest('.slider-row').querySelector('.slider-label span:first-child');
+        const wLabel = document.querySelector('[for="s-weight"], #s-weight').closest('.slider-row').querySelector('.slider-label span:first-child');
+
+        if (imperial) {
+            // Convert current metric values to imperial for display
+            const cmVal = parseFloat(hSlider.value);
+            const kgVal = parseFloat(wSlider.value);
+            const inVal = Math.round(cmVal / 2.54);
+            const lbVal = Math.round(kgVal * 2.205);
+
+            hSlider.min = 55; hSlider.max = 83; hSlider.step = 1; hSlider.value = inVal;
+            wSlider.min = 88; wSlider.max = 330; wSlider.step = 1; wSlider.value = lbVal;
+
+            hLabel.textContent = 'Height (in)';
+            wLabel.textContent = 'Weight (lbs)';
+
+            sliders.height.fmt = v => { const ft = Math.floor(v/12); const inn = v%12; return `${ft}'${inn}"`; };
+            sliders.weight.fmt = v => v + ' lbs';
+
+            // Temperature sliders
+            const taSlider = document.getElementById('s-ta');
+            const trSlider = document.getElementById('s-tr');
+            const taF = Math.round(parseFloat(taSlider.value) * 9/5 + 32);
+            const trF = Math.round(parseFloat(trSlider.value) * 9/5 + 32);
+            taSlider.min = 68; taSlider.max = 131; taSlider.step = 1; taSlider.value = taF;
+            trSlider.min = 68; trSlider.max = 158; trSlider.step = 1; trSlider.value = trF;
+
+            const taLabel = document.getElementById('s-ta').closest('.slider-row').querySelector('.slider-label span:first-child');
+            const trLabel = document.getElementById('s-tr').closest('.slider-row').querySelector('.slider-label span:first-child');
+            taLabel.textContent = 'Air Temperature';
+            trLabel.textContent = 'Mean Radiant Temp';
+
+            sliders.ta.fmt = v => v + '°F';
+            sliders.tr.fmt = v => v + '°F';
+
+            // Wind speed to mph
+            const vaSlider = document.getElementById('s-va');
+            const mphVal = (parseFloat(vaSlider.value) * 2.237).toFixed(1);
+            vaSlider.min = 0; vaSlider.max = 11.2; vaSlider.step = 0.2; vaSlider.value = mphVal;
+            sliders.va.fmt = v => v + ' mph';
+            const vaLabel = document.getElementById('s-va').closest('.slider-row').querySelector('.slider-label span:first-child');
+            vaLabel.textContent = 'Wind Speed';
+        } else {
+            // Convert back to metric
+            const inVal = parseFloat(hSlider.value);
+            const lbVal = parseFloat(wSlider.value);
+            const cmVal = Math.round(inVal * 2.54);
+            const kgVal = Math.round(lbVal / 2.205);
+
+            hSlider.min = 140; hSlider.max = 210; hSlider.step = 1; hSlider.value = cmVal;
+            wSlider.min = 40; wSlider.max = 150; wSlider.step = 1; wSlider.value = kgVal;
+
+            hLabel.textContent = 'Height (cm)';
+            wLabel.textContent = 'Weight (kg)';
+
+            sliders.height.fmt = v => v + ' cm';
+            sliders.weight.fmt = v => v + ' kg';
+
+            // Temperature back to °C
+            const taSlider = document.getElementById('s-ta');
+            const trSlider = document.getElementById('s-tr');
+            const taC = Math.round((parseFloat(taSlider.value) - 32) * 5/9);
+            const trC = Math.round((parseFloat(trSlider.value) - 32) * 5/9);
+            taSlider.min = 20; taSlider.max = 55; taSlider.step = 1; taSlider.value = taC;
+            trSlider.min = 20; trSlider.max = 70; trSlider.step = 1; trSlider.value = trC;
+
+            sliders.ta.fmt = v => v + '°C';
+            sliders.tr.fmt = v => v + '°C';
+
+            // Wind back to m/s
+            const vaSlider = document.getElementById('s-va');
+            const msVal = (parseFloat(vaSlider.value) / 2.237).toFixed(1);
+            vaSlider.min = 0; vaSlider.max = 5; vaSlider.step = 0.1; vaSlider.value = msVal;
+            sliders.va.fmt = v => v + ' m/s';
+        }
+
+        // Refresh all displayed values
+        for (const [k, s] of Object.entries(sliders)) {
+            const el = document.getElementById(s.el);
+            document.getElementById(s.vEl).textContent = s.fmt(el.value);
+        }
+    }
+
+    // Init Pyodide + JOS-3
+    async function initPyodide() {
+        const btn = document.getElementById('run-btn');
+        btn.textContent = 'Loading Python runtime...';
+        btn.disabled = true;
+
+        pyodide = await loadPyodide();
+        await pyodide.loadPackage(['numpy', 'micropip']);
+        await pyodide.runPythonAsync(`
+            import micropip
+            await micropip.install('jos3')
+        `);
+
+        btn.textContent = 'Run JOS-3 Simulation';
+        btn.disabled = false;
+    }
+
+    // Temperature to color
+    function tempToColor(t) {
+        const min = 30, max = 42;
+        const ratio = Math.max(0, Math.min(1, (t - min) / (max - min)));
+        // Anchored: 33°C normal skin (blue→green), 40°C dangerously elevated (red→purple)
+        // ratio: 30°C=0, 33°C=0.25, 36°C=0.5, 40°C=0.83, 42°C=1.0
+        const stops = [
+            [0.0,   [59, 130, 246]],   // 30°C — cool (blue)
+            [0.25,  [34, 197, 94]],    // 33°C — normal resting skin temp (green)
+            [0.5,   [250, 204, 21]],   // 36°C — elevated (yellow)
+            [0.67,  [249, 115, 22]],   // 38°C — transition (orange)
+            [0.83,  [239, 68, 68]],    // 40°C — dangerously elevated (red)
+            [1.0,   [168, 85, 247]],   // 42°C — extreme (purple)
+        ];
+        let i = 0;
+        for (let j = 1; j < stops.length; j++) {
+            if (ratio <= stops[j][0]) { i = j - 1; break; }
+            if (j === stops.length - 1) i = j - 1;
+        }
+        const [r0, c0] = stops[i];
+        const [r1, c1] = stops[i + 1];
+        const p = (ratio - r0) / (r1 - r0);
+        const r = Math.round(c0[0] + (c1[0] - c0[0]) * p);
+        const g = Math.round(c0[1] + (c1[1] - c0[1]) * p);
+        const b = Math.round(c0[2] + (c1[2] - c0[2]) * p);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    // Core temp to CSS class (acclimatization-aware)
+    function coreClass(t) {
+        const accl = document.getElementById('sel-accl').value === 'acclimatized';
+        const limit = accl ? 38.5 : 38.0;
+        if (t < limit - 0.5) return 'stat-safe';
+        if (t < limit) return 'stat-caution';
+        if (t < limit + 0.5) return 'stat-danger';
+        return 'stat-extreme';
+    }
+
+    function alertClass(t) {
+        const accl = document.getElementById('sel-accl').value === 'acclimatized';
+        const limit = accl ? 38.5 : 38.0;
+        const label = accl ? 'acclimatized' : 'unacclimatized';
+        if (t < limit - 0.5) return { cls: 'alert-safe', msg: `Safe — no thermal strain detected (${label}, limit ${limit}°C)` };
+        if (t < limit) return { cls: 'alert-caution', msg: `Caution — approaching ${limit}°C core limit (${label}). Consider reducing intensity.` };
+        if (t < limit + 0.5) return { cls: 'alert-danger', msg: `Danger — core temp exceeds ${limit}°C limit (${label}). Schedule rest breaks.` };
+        return { cls: 'alert-extreme', msg: `STOP WORK — core temperature far exceeds ${limit}°C safe limit. Medical risk.` };
+    }
+
+    async function runSimulation() {
+        if (!pyodide) return;
+
+        const btn = document.getElementById('run-btn');
+        btn.textContent = 'Running simulation...';
+        btn.disabled = true;
+
+        let ta  = parseFloat(document.getElementById('s-ta').value);
+        let tr  = parseFloat(document.getElementById('s-tr').value);
+        const rh  = document.getElementById('s-rh').value;
+        let va  = parseFloat(document.getElementById('s-va').value);
+        const met = document.getElementById('s-met').value;
+        const clo = document.getElementById('s-clo').value;
+        const dur = document.getElementById('s-dur').value;
+        const posture = document.getElementById('sel-posture').value;
+        let height = parseFloat(document.getElementById('s-height').value);
+        let weight = parseFloat(document.getElementById('s-weight').value);
+        const age = document.getElementById('s-age').value;
+        const sex = document.getElementById('sel-sex').value;
+        const fat = document.getElementById('s-fat').value;
+
+        // Convert imperial → metric for the model
+        if (imperial) {
+            height = height * 2.54;        // inches → cm
+            weight = weight / 2.205;       // lbs → kg
+            ta = (ta - 32) * 5/9;          // °F → °C
+            tr = (tr - 32) * 5/9;          // °F → °C
+            va = va / 2.237;               // mph → m/s
+        }
+
+        const heightM = (height / 100).toFixed(2);
+        const weightKg = weight.toFixed(1);
+        const taC = ta.toFixed(1);
+        const trC = tr.toFixed(1);
+        const vaMs = va.toFixed(2);
+        const fatParam = fat == 0 ? '' : `, body_fat=${fat}`;
+
+        const result = await pyodide.runPythonAsync(`
+import jos3
+import json
+import numpy as np
+
+m = jos3.JOS3(height=${heightM}, weight=${weightKg}, age=${age}, sex='${sex}'${fatParam})
+m.Ta = ${taC}
+m.Tr = ${trC}
+m.RH = ${rh}
+m.Va = ${vaMs}
+m.PAR = ${met}
+m.posture = '${posture}'
+m.simulate(${dur})
+d = m.dict_results()
+
+segments = ['Head','Neck','Chest','Back','Pelvis',
+            'LShoulder','LArm','LHand','RShoulder','RArm','RHand',
+            'LThigh','LLeg','LFoot','RThigh','RLeg','RFoot']
+
+result = {
+    'time': list(range(${dur}+1)),
+    'tcr_chest': [float(x) for x in d['TcrChest']],
+    'tcr_head': [float(x) for x in d['TcrHead']],
+    'tsk_mean': [float(x) for x in d['TskMean']],
+    'wet_mean': [float(x) for x in d['WetMean']],
+    'segments': {},
+}
+
+for seg in segments:
+    result['segments'][seg] = {
+        'skin': float(d[f'Tsk{seg}'][-1]),
+        'core': float(d[f'Tcr{seg}'][-1]),
+    }
+
+# Per-segment skin over time for chart (subset)
+for seg in ['Head','Chest','LHand','LThigh','LFoot']:
+    result[f'tsk_{seg}'] = [float(x) for x in d[f'Tsk{seg}']]
+
+json.dumps(result)
+        `);
+
+        const data = JSON.parse(result);
+        updateCharts(data);
+        updateStats(data);
+        updateBodyMap(data);
+        updateSegmentGrid(data);
+
+        btn.textContent = 'Run JOS-3 Simulation';
+        btn.disabled = false;
+    }
+
+    function updateCharts(data) {
+        const timeLabels = data.time.map(t => t + ' min');
+
+        // Core temp chart
+        if (charts.core) charts.core.destroy();
+        charts.core = new Chart(document.getElementById('chart-core'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [
+                    {
+                        label: 'Core (Chest)',
+                        data: data.tcr_chest,
+                        borderColor: '#f87171',
+                        backgroundColor: 'rgba(248,113,113,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 0,
+                    },
+                    {
+                        label: 'Core (Head)',
+                        data: data.tcr_head,
+                        borderColor: '#fb923c',
+                        borderDash: [4, 4],
+                        tension: 0.3,
+                        pointRadius: 0,
+                    },
+                    {
+                        label: 'Danger (38.5°C)',
+                        data: data.time.map(() => 38.5),
+                        borderColor: 'rgba(239,68,68,0.5)',
+                        borderDash: [8, 4],
+                        pointRadius: 0,
+                        borderWidth: 1,
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#475569', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: '#f1f5f9' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#f1f5f9' }, min: 36, suggestedMax: 40 }
+                }
+            }
+        });
+
+        // Skin temp chart
+        if (charts.skin) charts.skin.destroy();
+        const skinColors = { Head: '#38bdf8', Chest: '#a78bfa', LHand: '#fb923c', LThigh: '#4ade80', LFoot: '#f472b6' };
+        charts.skin = new Chart(document.getElementById('chart-skin'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: Object.entries(skinColors).map(([seg, color]) => ({
+                    label: seg,
+                    data: data[`tsk_${seg}`],
+                    borderColor: color,
+                    tension: 0.3,
+                    pointRadius: 0,
+                }))
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#475569', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: '#f1f5f9' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#f1f5f9' } }
+                }
+            }
+        });
+
+        // Wettedness chart
+        if (charts.wet) charts.wet.destroy();
+        charts.wet = new Chart(document.getElementById('chart-wet'), {
+            type: 'line',
+            data: {
+                labels: timeLabels,
+                datasets: [{
+                    label: 'Mean Skin Wettedness',
+                    data: data.wet_mean.map(v => v * 100),
+                    borderColor: '#fbbf24',
+                    backgroundColor: 'rgba(251,191,36,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#475569', font: { size: 11 } } } },
+                scales: {
+                    x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 }, grid: { color: '#f1f5f9' } },
+                    y: { ticks: { color: '#94a3b8' }, grid: { color: '#f1f5f9' }, min: 0, max: 100 }
+                }
+            }
+        });
+    }
+
+    function updateStats(data) {
+        const peakCore = Math.max(...data.tcr_chest);
+        const peakSkin = data.tsk_mean[data.tsk_mean.length - 1];
+        const peakWet = Math.max(...data.wet_mean);
+
+        // Max safe time per ISO 7933 thresholds (no extrapolation — run longer sim if needed)
+        // Core temp limit: 38.0°C (unacclimatized) / 38.5°C (acclimatized)
+        // Skin wettedness limit: 0.85 (unacc.) / 1.0 (acc.)
+        const accl = document.getElementById('sel-accl').value;
+        const coreLimit = accl === 'acclimatized' ? 38.5 : 38.0;
+        const wetLimit = accl === 'acclimatized' ? 1.0 : 0.85;
+        const coreDangerIdx = data.tcr_chest.findIndex(t => t > coreLimit);
+        const wetDangerIdx = data.wet_mean.findIndex(w => w > wetLimit);
+
+        const candidates = [coreDangerIdx, wetDangerIdx].filter(i => i > 0);
+        const safeTime = candidates.length > 0 ? Math.min(...candidates) : -1;
+
+        const coreEl = document.getElementById('stat-core');
+        coreEl.textContent = peakCore.toFixed(1) + '°C';
+        coreEl.className = 'stat-value ' + coreClass(peakCore);
+
+        document.getElementById('stat-skin').textContent = peakSkin.toFixed(1) + '°C';
+        document.getElementById('stat-wet').textContent = Math.round(peakWet * 100) + '%';
+
+        const timeEl = document.getElementById('stat-time');
+        if (safeTime === -1) {
+            timeEl.textContent = '>' + (data.time.length - 1) + ' min';
+            timeEl.style.color = '#16a34a';
+        } else {
+            timeEl.textContent = safeTime + ' min';
+            timeEl.style.color = '#dc2626';
+        }
+
+        const alert = alertClass(peakCore);
+        const alertBox = document.getElementById('alert-box');
+        alertBox.className = 'alert-banner ' + alert.cls;
+        alertBox.textContent = alert.msg;
+    }
+
+    function updateBodyMap(data) {
+        const segMap = {
+            'Head': 'seg-head', 'Neck': 'seg-neck', 'Chest': 'seg-chest',
+            'Back': 'seg-back', 'Pelvis': 'seg-pelvis',
+            'LShoulder': 'seg-lshoulder', 'LArm': 'seg-larm', 'LHand': 'seg-lhand',
+            'RShoulder': 'seg-rshoulder', 'RArm': 'seg-rarm', 'RHand': 'seg-rhand',
+            'LThigh': 'seg-lthigh', 'LLeg': 'seg-lleg', 'LFoot': 'seg-lfoot',
+            'RThigh': 'seg-rthigh', 'RLeg': 'seg-rleg', 'RFoot': 'seg-rfoot',
+        };
+        for (const [seg, elId] of Object.entries(segMap)) {
+            const el = document.getElementById(elId);
+            if (el && data.segments[seg]) {
+                el.setAttribute('fill', tempToColor(data.segments[seg].skin));
+            }
+        }
+    }
+
+    function updateSegmentGrid(data) {
+        const grid = document.getElementById('segment-grid');
+        const names = {
+            Head: 'Head', Neck: 'Neck', Chest: 'Chest', Back: 'Back',
+            Pelvis: 'Pelvis', LShoulder: 'L Shoulder', LArm: 'L Arm', LHand: 'L Hand',
+            RShoulder: 'R Shoulder', RArm: 'R Arm', RHand: 'R Hand',
+            LThigh: 'L Thigh', LLeg: 'L Leg', LFoot: 'L Foot',
+            RThigh: 'R Thigh', RLeg: 'R Leg', RFoot: 'R Foot',
+        };
+        grid.innerHTML = '';
+        for (const [key, label] of Object.entries(names)) {
+            const s = data.segments[key];
+            if (!s) continue;
+            const div = document.createElement('div');
+            div.className = 'segment-item';
+            div.innerHTML = `<span>${label}</span><span class="seg-temp" style="color:${tempToColor(s.skin)}">${s.skin.toFixed(1)}°C</span>`;
+            grid.appendChild(div);
+        }
+    }
+
+    // Init on load
+    initPyodide();
+    </script>
+</body>
+</html>
